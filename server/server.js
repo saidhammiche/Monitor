@@ -14,7 +14,7 @@ const config = {
 const express = require('express');
 const cors = require('cors');
 const sql = require('mssql');
-
+const path = require('path');
 
 
 const app = express();
@@ -101,7 +101,7 @@ app.get('/api/charge/:id', async (req, res) => {
       nummerPanter : row.NummerPanter,
       bezeichnung : row.Bezeichnung,
       startzeit: row.Startzeit,
-      endzeit: row.Endzeit,
+      endezeit: row.Endzeit,
       anzahlBlocke: anzahlBlocke,
       anzahlBloeckeGut: row.AnzahlBloeckeGut,
       anzahlBloeckeSchlecht: row.AnzahlBloeckeSchlecht,
@@ -113,9 +113,12 @@ app.get('/api/charge/:id', async (req, res) => {
   }
 })
  
-
+app.use(express.static(path.join(__dirname, '../chargen-monitor/build')));
  
 
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../chargen-monitor/build', 'index.html'));
+});
 
 app.listen(5000, '0.0.0.0', () => {
     console.log("Server läuft auf Port 5000");
