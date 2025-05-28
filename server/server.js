@@ -15,6 +15,8 @@ const express = require('express');
 const cors = require('cors');
 const sql = require('mssql');
 
+
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -77,7 +79,7 @@ app.get('/api/charge/:id', async (req, res) => {
     res.status(500).send('Error retrieving data');
   }
 });
-
+  
 
  app.get('/api/efcharge/:id', async (req, res) => {
   const id = req.params.id;
@@ -110,10 +112,12 @@ app.get('/api/charge/:id', async (req, res) => {
     res.status(500).send('Error retrieving data');
   }
 })
+ 
+
+ 
 
 
-
-const PORT = 5000;
-app.listen(PORT, () => {
-  console.log(`Server läuft auf Port ${PORT}`);
+app.listen(5000, '0.0.0.0', () => {
+    console.log("Server läuft auf Port 5000");
 });
+;
