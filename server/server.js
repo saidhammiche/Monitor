@@ -3,10 +3,10 @@ const express = require('express');
 const cors = require('cors');
 const sql = require('mssql');
 
-
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Configuration de la base de données SQL Server
 const config = {
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
@@ -32,7 +32,8 @@ async function getPool() {
 app.get('/api/chargeids', async (req, res) => {
   try {
     const pool = await getPool();
-    const result = await pool.request().query('SELECT ChargeID FROM FE_Charge');
+    const result = await pool.request().query('SELECT ChargeID FROM FE_ViewBlock ');
+
     const chargeIDs = result.recordset.map(row => row.ChargeID);
     res.json(chargeIDs);
   } catch (err) {
@@ -61,7 +62,9 @@ app.get('/api/charge/:id', async (req, res) => {
       anzahlBloeckeGut: row.AnzahlBloeckeGut,
       anzahlBloeckeSchlecht: row.AnzahlBloeckeSchlecht,
       status: row.Status,
-      daten: row.Daten
+      daten: row.Daten,
+      lieferant: row.Lieferant,
+      sorte: row.Sorte
     });
   } catch (error) {
     console.error('SQL error:', error);
@@ -69,6 +72,7 @@ app.get('/api/charge/:id', async (req, res) => {
   }
 });
 
+// 🔹 Route: Variante EF de la charge
 app.get('/api/efcharge/:id', async (req, res) => {
   const id = req.params.id;
   try {
@@ -90,6 +94,8 @@ app.get('/api/efcharge/:id', async (req, res) => {
       anzahlBlocke,
       anzahlBloeckeGut: row.AnzahlBloeckeGut,
       anzahlBloeckeSchlecht: row.AnzahlBloeckeSchlecht,
+      lieferant: row.Lieferant,
+      sorte: row.Sorte
     });
   } catch (error) {
     console.error('SQL error:', error);
@@ -97,10 +103,30 @@ app.get('/api/efcharge/:id', async (req, res) => {
   }
 });
 
+// 🔹 Route: Obtenir les blocs d’une charge
+app.get('/api/blocks/:id', async (req, res) => {
+  const id = req.params.id;
+  try {
+    const pool = await getPool();
+    const result = await pool.request()
+      .input('id', sql.VarChar, id)
+      .query(`
+        SELECT BlockID, schlecht, Startzeit, Endzeit
+        FROM FE_ViewBlock
+        WHERE ChargeID = @id
+      `);
 
+    const rows = result.recordset;
+    if (!rows || rows.length === 0) return res.status(404).send('Not found');
 
+    res.json(rows);
+  } catch (error) {
+    console.error('SQL error:', error);
+    res.status(500).send('Error retrieving blocks');
+  }
+});
 
-
+// 🔸 Lancer le serveur sur toutes les interfaces
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Server läuft auf Port ${PORT}`);
 });

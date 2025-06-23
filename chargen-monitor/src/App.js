@@ -1,27 +1,41 @@
-import React, { useState, useEffect } from 'react'; 
+import React, { useState, useEffect } from 'react';
 import { jsPDF } from 'jspdf';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 
-function formatDateTime(dateTimeStr) {
-  if (!dateTimeStr) return '-';
-  const date = new Date(dateTimeStr);
-  return date.toLocaleString('de-DE', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
-}
 
 function toDateTimeLocal(dateTimeStr) {
   if (!dateTimeStr) return '';
-  const date = new Date(dateTimeStr);
-  const isoString = date.toISOString();
-  return isoString.substring(0, 16);
+
+  
+  const match = dateTimeStr.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})/);
+
+  if (match) {
+    return match[1];  
+  } else {
+    return dateTimeStr; 
+  }
 }
+
+
+
+function formatDateTime(dateTimeStr) {
+  if (!dateTimeStr) return '-';
+  const match = dateTimeStr.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})/);
+  
+  if (match) {
+    return `${match[1]} ${match[2]}`;
+  } else {
+    
+    return dateTimeStr;
+  }
+}
+
+
+
+
+
+
 
 function App() {
   const [chargeIds, setChargeIds] = useState([]);
@@ -32,23 +46,28 @@ function App() {
     anzahlBloeckeGut: '',
     anzahlBloeckeSchlecht: '',
     anzahlBlocke: '',
+    lieferant: '',
+    sorte: ''
   });
 
   const [loadingIds, setLoadingIds] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
-  const [chargeData, setChargeData] = useState([]);
+
   const [zogihortigeDaten, setZogihortigeDaten] = useState(null);
   const [loadingZogihortige, setLoadingZogihortige] = useState(false);
+  const [blocks, setBlocks] = useState([]);
 
+
+  const [loadingBlocks, setLoadingBlocks] = useState(false);
   const fetchZogihortigeDaten = async () => {
     if (!formData.chargenNr) {
       alert('Bitte wählen Sie zuerst eine ChargenNr aus!');
       return;
     }
-    
+
     setLoadingZogihortige(true);
     try {
-      const response = await fetch(`http://localhost:5000/api/efcharge/${formData.chargenNr}`);
+      const response = await fetch(`http://4.245.3.186:5000/api/efcharge/${formData.chargenNr}`);
       if (!response.ok) {
         throw new Error('Fehler beim Laden der Daten');
       }
@@ -66,7 +85,7 @@ function App() {
     const fetchChargeIds = async () => {
       setLoadingIds(true);
       try {
-        const response = await fetch('http://localhost:5000/api/chargeids');
+        const response = await fetch('http://4.245.3.186:5000/api/chargeids');
         if (!response.ok) {
           const errorData = await response.json();
           alert(errorData.error || 'Fehler beim Laden der ChargeIDs');
@@ -89,7 +108,6 @@ function App() {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
     if (name === 'chargenNr') {
-      setChargeData([]);
       setZogihortigeDaten(null);
       setFormData(prev => ({
         ...prev,
@@ -98,6 +116,8 @@ function App() {
         anzahlBloeckeGut: '',
         anzahlBloeckeSchlecht: '',
         anzahlBlocke: '',
+        lieferant: '',
+        sorte: ''
       }));
     }
   };
@@ -107,12 +127,14 @@ function App() {
       alert('Bitte wählen Sie eine ChargenNr aus!');
       return;
     }
+
     setLoadingData(true);
     try {
-      const response = await fetch(`http://localhost:5000/api/charge/${formData.chargenNr}`);
+      const response = await fetch(`http://4.245.3.186:5000/api/charge/${formData.chargenNr}`);
       if (!response.ok) {
         const errorData = await response.json();
         alert(errorData.error || 'Fehler beim Laden der Daten');
+
         setFormData(prev => ({
           ...prev,
           startzeit: '',
@@ -120,18 +142,21 @@ function App() {
           anzahlBlocke: '',
           anzahlBloeckeGut: '',
           anzahlBloeckeSchlecht: '',
+          lieferant: '',
+          sorte: ''
         }));
-        setChargeData([]);
       } else {
-        const data = await response.json();
-        setChargeData(data.details || []);
+        const result = await response.json();
+
         setFormData(prev => ({
           ...prev,
-          startzeit: data.startzeit || '',
-          endzeit: data.endzeit || '',
-          anzahlBloeckeGut: data.anzahlBloeckeGut ?? '',
-          anzahlBloeckeSchlecht: data.anzahlBloeckeSchlecht ?? '',
-          anzahlBlocke: (Number(data.anzahlBloeckeGut) || 0) + (Number(data.anzahlBloeckeSchlecht) || 0),
+          startzeit: result.startzeit || '',
+          endzeit: result.endzeit || '',
+          anzahlBloeckeGut: result.anzahlBloeckeGut ?? '',
+          anzahlBloeckeSchlecht: result.anzahlBloeckeSchlecht ?? '',
+          anzahlBlocke: (Number(result.anzahlBloeckeGut) || 0) + (Number(result.anzahlBloeckeSchlecht) || 0),
+          lieferant: result.lieferant || '',
+          sorte: result.sorte || ''
         }));
       }
     } catch (error) {
@@ -139,6 +164,25 @@ function App() {
       console.error(error);
     } finally {
       setLoadingData(false);
+    }
+  };
+
+  const fetchBlocks = async () => {
+    if (!formData.chargenNr) {
+      alert('Bitte wählen Sie zuerst eine ChargenNr aus!');
+      return;
+    }
+    setLoadingBlocks(true);
+    try {
+      const resp = await fetch(`http://4.245.3.186:5000/api/blocks/${formData.chargenNr}`);
+      if (!resp.ok) throw new Error('Fehler beim Laden der Blocke');
+      const data = await resp.json();
+      setBlocks(data);
+    } catch (e) {
+      alert(e.message);
+      console.error(e);
+    } finally {
+      setLoadingBlocks(false);
     }
   };
 
@@ -180,44 +224,49 @@ function App() {
     printField('Blöcke (Gut)', formData.anzahlBloeckeGut);
     printField('Blöcke (Schlecht)', formData.anzahlBloeckeSchlecht);
     printField('Blöcke (Gesamt)', formData.anzahlBlocke);
+    printField('Lieferant', formData.lieferant);
+    printField('Sorte', formData.sorte);
 
 
 
-      if (zogihortigeDaten) {
-    y += 15;
-    pdf.setFontSize(14);
-    pdf.setTextColor('#0d6efd');
-    pdf.text('Zugihörige Daten', leftMargin, y);
-    y += 15; // Espace supplémentaire après le titre
 
-    // Configuration des champs
-    const fields = [
-      { label: 'NummerPanter', value: zogihortigeDaten.nummerPanter || '-' },
-      { label: 'Bezeichnung', value: zogihortigeDaten.bezeichnung || '-' },
-      { label: 'Start', value: formatDateTime(zogihortigeDaten.startzeit) },
-      { label: 'Ende', value: formatDateTime(zogihortigeDaten.endzeit) },
-      { label: 'BlokOk', value: zogihortigeDaten.anzahlBloeckeGut?.toString() || '0' },
-      { label: 'BlokSchlecht', value: zogihortigeDaten.anzahlBloeckeSchlecht?.toString() || '0' },
-      { label: 'Gesamt', value: zogihortigeDaten.anzahlBlocke?.toString() || '0' }
-    ];
+    if (zogihortigeDaten) {
+      y += 15;
+      pdf.setFontSize(12);
+      pdf.setTextColor(0, 0, 0);
+      pdf.text('Zugihörige Daten', leftMargin, y);
+      y += 15;
 
-    // Affichage avec style distinctif
-    fields.forEach((field) => {
-      // Label en gras + bleu
-      pdf.setFontSize(11);
-      pdf.setTextColor('#0d6efd'); // Bleu Bootstrap
-      pdf.setFont(undefined, 'bold');
-      pdf.text(`${field.label} :`, leftMargin, y);
-      
-      // Valeur en noir + décalée
-      pdf.setFontSize(11);
-      pdf.setTextColor('#000000');
-      pdf.setFont(undefined, 'normal');
-      pdf.text(field.value, leftMargin + 40, y); // Décalage de 40mm
-      
-      y += 10; // Espacement généreux entre les lignes
-    });
-  }
+
+      const fields = [
+        { label: 'NummerPanter', value: zogihortigeDaten.nummerPanter || '-' },
+        { label: 'Bezeichnung', value: zogihortigeDaten.bezeichnung || '-' },
+        { label: 'Start', value: formatDateTime(zogihortigeDaten.startzeit) },
+        { label: 'Ende', value: formatDateTime(zogihortigeDaten.endzeit) },
+        { label: 'BlokOk', value: zogihortigeDaten.anzahlBloeckeGut?.toString() || '0' },
+        { label: 'BlokSchlecht', value: zogihortigeDaten.anzahlBloeckeSchlecht?.toString() || '0' },
+        { label: 'Gesamt', value: zogihortigeDaten.anzahlBlocke?.toString() || '0' },
+        { label: 'Lieferant', value: zogihortigeDaten.lieferant || '-' },
+        { label: 'Sorte', value: zogihortigeDaten.sorte || '-' }
+      ];
+
+
+      fields.forEach((field) => {
+
+        pdf.setFontSize(12);
+        pdf.setTextColor(0, 0, 0);
+        pdf.setFont(undefined, 'bold');
+        pdf.text(`${field.label} :`, leftMargin, y);
+
+
+        pdf.setFontSize(12);
+        pdf.setTextColor('#000000');
+        pdf.setFont(undefined, 'normal');
+        pdf.text(field.value, leftMargin + 40, y);
+
+        y += 10;
+      });
+    }
 
     y += 10;
     pdf.setFontSize(9);
@@ -227,15 +276,13 @@ function App() {
     pdf.save(`ChargenNr_${formData.chargenNr || 'Bericht'}.pdf`);
   };
 
+
+
+
+
   return (
     <>
-      <nav className="navbar navbar-dark bg-dark shadow rounded-bottom-4 mb-4">
-        <div className="container">
-          <span className="navbar-brand mb-0 h1 fs-5">
-            🏭 MRS Metall Recycling Service Willich GmbH & Co. KG
-          </span>
-        </div>
-      </nav>
+
 
       <div className="container py-5">
         <div className="row justify-content-center">
@@ -263,129 +310,214 @@ function App() {
                   </select>
                 </div>
 
-                <div className="mb-3">
-                  <label className="form-label fw-semibold">Startzeit</label>
-                  <input
-                    type="datetime-local"
-                    className="form-control"
-                    name="startzeit"
-                    value={toDateTimeLocal(formData.startzeit)}
-                    readOnly
-                  />
-                </div>
-
-                <div className="mb-3">
-                  <label className="form-label fw-semibold">Endzeit</label>
-                  <input
-                    type="datetime-local"
-                    className="form-control"
-                    name="endzeit"
-                    value={toDateTimeLocal(formData.endzeit)}
-                    readOnly
-                  />
-                </div>
-
-                <div className="mb-3">
-                  <label className="form-label fw-semibold">Blöcke Gut</label>
-                  <input
-                    type="number"
-                    className="form-control"
-                    name="anzahlBloeckeGut"
-                    value={formData.anzahlBloeckeGut}
-                    readOnly
-                  />
-                </div>
-
-                <div className="mb-3">
-                  <label className="form-label fw-semibold">Blöcke Schlecht</label>
-                  <input
-                    type="number"
-                    className="form-control"
-                    name="anzahlBloeckeSchlecht"
-                    value={formData.anzahlBloeckeSchlecht}
-                    readOnly
-                  />
-                </div>
-
-                <div className="mb-3">
-                  <label className="form-label fw-semibold">Blöcke Gesamt</label>
-                  <input
-                    type="number"
-                    className="form-control"
-                    name="anzahlBlocke"
-                    value={formData.anzahlBlocke}
-                    readOnly
-                  />
-                </div>
-
-                <div className="d-flex justify-content-between mt-4">
-                  <button
-                    type="button"
-                    className="btn btn-outline-secondary"
-                    onClick={loadGehoerteDaten}
-                    disabled={loadingData || !formData.chargenNr}
-                  >
-                    {loadingData ? 'Laden...' : 'Daten laden'}
-                  </button>
-
-                  <button
-                    type="button"
-                    className="btn btn-success px-4 py-2 rounded-3 shadow-sm"
-                    onClick={generatePDF}
-                    disabled={!formData.chargenNr}
-                  >
-                    <i className="bi bi-file-earmark-pdf-fill me-2"></i>
-                    PDF generieren
-                  </button>
-                </div>
-
-                <div className="mt-3">
-                  <button
-                    type="button"
-                    className="btn btn-info"
-                    onClick={fetchZogihortigeDaten}
-                    disabled={loadingZogihortige || !formData.chargenNr}
-                  >
-                    {loadingZogihortige ? 'Laden...' : 'ZogihortigeDaten'}
-                  </button>
-                </div>
-
-                {zogihortigeDaten && (
-                  <div className="mt-4">
-                    <h5 className="mb-3">Zogihortige Daten für Charge {formData.chargenNr}</h5>
-                    <div className="table-responsive">
-                      <table className="table table-bordered table-striped">
-                        <thead className="table-primary">
-                          <tr>
-                            <th>NummerPanter</th>
-                            <th>Bezeichnung</th>
-                            <th>Startzeit</th>
-                            <th>Endzeit</th>
-                            <th>Blöcke Gut</th>
-                            <th>Blöcke Schlecht</th>
-                            <th>Blöcke Gesamt</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr>
-                            <td>{zogihortigeDaten.nummerPanter || '-'}</td>
-                            <td>{zogihortigeDaten.bezeichnung || '-'}</td>
-                            <td>{formatDateTime(zogihortigeDaten.startzeit)}</td>
-                            <td>{formatDateTime(zogihortigeDaten.endzeit)}</td>
-                            <td>{zogihortigeDaten.anzahlBloeckeGut || '0'}</td>
-                            <td>{zogihortigeDaten.anzahlBloeckeSchlecht || '0'}</td>
-                            <td>{zogihortigeDaten.anzahlBlocke || '0'}</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
+                <div className="row mb-3">
+                  <div className="col">
+                    <label className="form-label fw-semibold">Startzeit</label>
+                    <input
+                      type="datetime-local"
+                      className="form-control"
+                      name="startzeit"
+                      value={toDateTimeLocal(formData.startzeit)}
+                      readOnly
+                    />
                   </div>
-                )}
+                  <div className="col">
+                    <label className="form-label fw-semibold">Endzeit</label>
+                    <input
+                      type="datetime-local"
+                      className="form-control"
+                      name="endzeit"
+                      value={toDateTimeLocal(formData.endzeit)}
+                      readOnly
+                    />
+                  </div>
+                </div>
+                <div className="row mb-3">
+                  <div className="col">
+                    <label className="form-label fw-semibold">Lieferant</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      name="lieferant"
+                      value={formData.lieferant}
+                      readOnly
+                    />
+                  </div>
+                  <div className="col">
+                    <label className="form-label fw-semibold">Sorte</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      name="sorte"
+                      value={formData.sorte}
+                      readOnly
+                    />
+                  </div>
+                </div>
+
+                <div className="row mb-3">
+                  <div className="col">
+                    <label className="form-label fw-semibold">Blöcke Schlecht</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      name="anzahlBloeckeSchlecht"
+                      value={formData.anzahlBloeckeSchlecht}
+                      readOnly
+                    />
+                  </div>
+                  <div className="col">
+                    <label className="form-label fw-semibold">Blöcke Gut</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      name="anzahlBloeckeGut"
+                      value={formData.anzahlBloeckeGut}
+                      readOnly
+                    />
+                  </div>
+                  <div className="col">
+                    <label className="form-label fw-semibold">Blöcke Gesamt</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      name="anzahlBlocke"
+                      value={formData.anzahlBlocke}
+                      readOnly
+                    />
+                  </div>
+                </div>
               </div>
+
+
+              <div className="mb-3 d-flex gap-3">
+                <button
+                  className="btn btn-outline-primary flex-grow-1"
+                  onClick={loadGehoerteDaten}
+                  disabled={loadingData || loadingIds || !formData.chargenNr}
+                >
+                  {loadingData ? 'Lädt...' : 'Daten laden'}
+                </button>
+
+                <button
+                  className="btn btn-primary flex-grow-1"
+                  onClick={generatePDF}
+                  disabled={loadingData || loadingIds || !formData.chargenNr}
+                >
+                  <i className="bi bi-file-earmark-pdf-fill me-2"></i>
+                  PDF herunterladen
+                </button>
+
+                <button
+                  className="btn btn-outline-info flex-grow-1"
+                  onClick={fetchZogihortigeDaten}
+                  disabled={loadingZogihortige || !formData.chargenNr}
+                >
+                  {loadingZogihortige ? 'Lädt...' : 'Zugehörige Daten'}
+                </button>
+              </div>
+
+              {/* Tableau des données zogihortigeDaten avec ligne rouge si anzahlBloeckeSchlecht === 1 */}
+              {zogihortigeDaten && (
+                <div className="mt-4">
+                  <h5 className="mb-3" style={{ textDecoration: 'underline' }}>
+                    <i className="bi bi-database me-2"></i>Zugehörige Daten für Charge {formData.chargenNr} : </h5>
+
+                  <div className="table-responsive">
+                    <table className="table table-bordered table-striped">
+                      <thead className="table-primary">
+                        <tr>
+                          <th>NummerPanter</th>
+                          <th>Bezeichnung</th>
+                          <th>Startzeit</th>
+                          <th>Endzeit</th>
+                          <th>Blöcke Gut</th>
+                          <th>Blöcke Schlecht</th>
+                          <th>Blöcke Gesamt</th>
+                          <th>Lieferant</th>
+                          <th>Sorte</th>
+
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td>{zogihortigeDaten.nummerPanter || '-'}</td>
+                          <td>{zogihortigeDaten.bezeichnung || '-'}</td>
+                          <td>{formatDateTime(zogihortigeDaten.startzeit)}</td>
+                          <td>{formatDateTime(zogihortigeDaten.endzeit)}</td>
+                          <td>{zogihortigeDaten.anzahlBloeckeGut || '0'}</td>
+                          <td>{zogihortigeDaten.anzahlBloeckeSchlecht || '0'}</td>
+                          <td>{zogihortigeDaten.anzahlBlocke || '0'}</td>
+                          <td>{zogihortigeDaten.lieferant || '-'}</td>
+                          <td>{zogihortigeDaten.sorte || '-'}</td>
+
+
+
+
+
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              <div className="mb-3 d-flex gap-3">
+                <button
+                  className="btn btn-outline-secondary flex-grow-1"
+                  onClick={fetchBlocks}
+                  disabled={loadingBlocks || !formData.chargenNr}
+                >
+                  {loadingBlocks ? 'Lädt...' : 'Zugehörige Blöcke '}
+                </button>
+              </div>
+              {blocks.length > 0 && (
+                <div className="mt-4">
+                  <h5 className="mb-3" style={{ textDecoration: 'underline' }}>
+                    <i className="bi bi-box-seam me-2"></i>Blöcke für Charge {formData.chargenNr} :</h5>
+
+                  <div className="table-responsive">
+                    <table className="table table-bordered table-striped">
+                      <thead className="table-secondary">
+                        <tr>
+                          <th>BlockID</th>
+                          <th>schlecht</th>
+                          <th>Startzeit</th>
+                          <th>Endzeit</th>
+                          <th>Aktion</th>
+
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {blocks.map((blk) => (
+                          <tr
+                            key={blk.BlockID}
+                            className={blk.schlecht === 1 ? 'table-danger' : ''}
+                          >
+                            <td>{blk.BlockID}</td>
+                            <td>{blk.schlecht}</td>
+                            <td>{formatDateTime(blk.Startzeit)}</td>
+                            <td>{formatDateTime(blk.Endzeit)}</td>
+                            <td>
+                              <button className="btn btn-success btn-sm">
+                                <i className="bi bi-eye"></i> Details
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+
+                    </table>
+                  </div>
+                </div>
+              )}
+
+
             </div>
           </div>
         </div>
       </div>
+
     </>
   );
 }

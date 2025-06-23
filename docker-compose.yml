@@ -11,6 +11,6 @@ services:
     build:
       context: ./server
     ports:
-      - "5000:5000"
+      - "5000:3000"
     env_file:
       - ./server/.env
