@@ -29,48 +29,71 @@ async function getPool() {
   return pool;
 }
 
-app.get('/api/chargeids', async (req, res) => {
+app.get('/api/zeitpaare', async (req, res) => {
   try {
     const pool = await getPool();
-    const result = await pool.request().query('SELECT ChargeID FROM FE_ViewBlock ');
+    const result = await pool.request().query(`
+      SELECT DISTINCT Startzeit, Endzeit
+      FROM FE_Charge
+      
+    `);
 
-    const chargeIDs = result.recordset.map(row => row.ChargeID);
-    res.json(chargeIDs);
+    console.log('zeitpaare:', result.recordset); 
+    res.json(result.recordset);
   } catch (err) {
     console.error('SQL error:', err);
-    res.status(500).json({ error: 'Fehler beim Laden der ChargeIDs' });
+    res.status(500).json({ error: 'Fehler beim Abrufen der Zeitpaare' });
   }
 });
 
-app.get('/api/charge/:id', async (req, res) => {
-  const id = req.params.id;
+
+
+
+app.get('/api/charges', async (req, res) => {
+  const { startzeit, endzeit } = req.query;
+
+  if (!startzeit || !endzeit) {
+    return res.status(400).json({ error: 'Startzeit und Endzeit sind erforderlich' });
+  }
+
   try {
     const pool = await getPool();
     const result = await pool.request()
-      .input('id', sql.VarChar, id)
-      .query('SELECT * FROM FE_Charge WHERE ChargeID = @id');
+      .input('start', sql.DateTime, new Date(startzeit))
+      .input('end', sql.DateTime, new Date(endzeit))
+      .query(`
+        SELECT TOP 1
+          ChargeID,
+          Sorte,
+          Lieferant,
+          AnzahlBloeckeGut,
+          AnzahlBloeckeSchlecht,
+          ISNULL(AnzahlBloeckeGut, 0) + ISNULL(AnzahlBloeckeSchlecht, 0) AS GesamtBlocke
+        FROM FE_Charge
+        WHERE Startzeit >= @start AND Endzeit <= @end
+        ORDER BY Startzeit ASC
+      `);
 
     const row = result.recordset[0];
-    if (!row) return res.status(404).send('Not found');
+    if (!row) {
+      return res.status(404).json({ error: 'Keine Charge im Zeitraum gefunden' });
+    }
 
-    const anzahlBlocke = (row.AnzahlBloeckeGut || 0) + (row.AnzahlBloeckeSchlecht || 0);
     res.json({
       chargenNr: row.ChargeID,
-      startzeit: row.Startzeit,
-      endzeit: row.Endzeit,
-      anzahlBlocke,
-      anzahlBloeckeGut: row.AnzahlBloeckeGut,
-      anzahlBloeckeSchlecht: row.AnzahlBloeckeSchlecht,
-      status: row.Status,
-      daten: row.Daten,
+      sorte: row.Sorte,
       lieferant: row.Lieferant,
-      sorte: row.Sorte
+      anzahlBloeckeGut: row.AnzahlBloeckeGut,
+      anzahlBloeckeSchlecht: row.AnzahlBloeckeSchlecht
     });
+
   } catch (error) {
-    console.error('SQL error:', error);
-    res.status(500).send('Error retrieving data');
+    console.error('SQL Fehler:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen der Daten' });
   }
 });
+
+
 
 // 🔹 Route: Variante EF de la charge
 app.get('/api/efcharge/:id', async (req, res) => {

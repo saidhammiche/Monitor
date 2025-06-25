@@ -3,39 +3,25 @@ import { jsPDF } from 'jspdf';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 
+function formatDateTime(dateTimeStr) {
+  if (!dateTimeStr) return '-';
+  const date = new Date(dateTimeStr);
+  return date.toLocaleString('de-DE', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
 
 function toDateTimeLocal(dateTimeStr) {
   if (!dateTimeStr) return '';
-
-  
-  const match = dateTimeStr.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})/);
-
-  if (match) {
-    return match[1];  
-  } else {
-    return dateTimeStr; 
-  }
+  const date = new Date(dateTimeStr);
+  const isoString = date.toISOString();
+  return isoString.substring(0, 16);
 }
-
-
-
-function formatDateTime(dateTimeStr) {
-  if (!dateTimeStr) return '-';
-  const match = dateTimeStr.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})/);
-  
-  if (match) {
-    return `${match[1]} ${match[2]}`;
-  } else {
-    
-    return dateTimeStr;
-  }
-}
-
-
-
-
-
-
 
 function App() {
   const [chargeIds, setChargeIds] = useState([]);
@@ -56,9 +42,79 @@ function App() {
   const [zogihortigeDaten, setZogihortigeDaten] = useState(null);
   const [loadingZogihortige, setLoadingZogihortige] = useState(false);
   const [blocks, setBlocks] = useState([]);
-
-
   const [loadingBlocks, setLoadingBlocks] = useState(false);
+  const [zeitPaare, setZeitPaare] = useState([]);
+
+  useEffect(() => {
+    const fetchZeitPaare = async () => {
+      try {
+        const response = await fetch('http://4.245.3.186:5000/api/zeitpaare');
+        const data = await response.json();
+        setZeitPaare(data);
+      } catch (error) {
+        console.error('Fehler beim Laden der Zeitpaare', error);
+      }
+    };
+
+    fetchZeitPaare();
+  }, []);
+
+
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    if (name === 'chargenNr') {
+      setZogihortigeDaten(null);
+      setFormData(prev => ({
+        ...prev,
+        startzeit: '',
+        endzeit: '',
+        anzahlBloeckeGut: '',
+        anzahlBloeckeSchlecht: '',
+        anzahlBlocke: '',
+        lieferant: '',
+        sorte: ''
+      }));
+    }
+  };
+
+  const loadGehoerteDaten = async () => {
+    const { startzeit, endzeit } = formData;
+
+    if (!startzeit || !endzeit) {
+      alert('Bitte wählen Sie Startzeit und Endzeit aus!');
+      return;
+    }
+
+    setLoadingData(true);
+    try {
+      const response = await fetch(`http://4.245.3.186:5000/api/charges?startzeit=${encodeURIComponent(startzeit)}&endzeit=${encodeURIComponent(endzeit)}`);
+      const result = await response.json();
+
+      if (!response.ok) {
+        alert(result.error || 'Fehler beim Laden der Daten');
+        return;
+      }
+
+      setFormData(prev => ({
+        ...prev,
+        chargenNr: result.chargenNr || '',
+        lieferant: result.lieferant || '',
+        sorte: result.sorte || '',
+        anzahlBloeckeGut: result.anzahlBloeckeGut ?? '',
+        anzahlBloeckeSchlecht: result.anzahlBloeckeSchlecht ?? '',
+        anzahlBlocke: (Number(result.anzahlBloeckeGut) || 0) + (Number(result.anzahlBloeckeSchlecht) || 0),
+      }));
+
+    } catch (error) {
+      alert('Verbindungsfehler zum Server beim Laden der Daten');
+      console.error(error);
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
   const fetchZogihortigeDaten = async () => {
     if (!formData.chargenNr) {
       alert('Bitte wählen Sie zuerst eine ChargenNr aus!');
@@ -81,91 +137,6 @@ function App() {
     }
   };
 
-  useEffect(() => {
-    const fetchChargeIds = async () => {
-      setLoadingIds(true);
-      try {
-        const response = await fetch('http://4.245.3.186:5000/api/chargeids');
-        if (!response.ok) {
-          const errorData = await response.json();
-          alert(errorData.error || 'Fehler beim Laden der ChargeIDs');
-          setChargeIds([]);
-        } else {
-          const data = await response.json();
-          setChargeIds(data);
-        }
-      } catch (error) {
-        alert('Verbindungsfehler zum Server beim Laden der ChargeIds');
-        console.error(error);
-      } finally {
-        setLoadingIds(false);
-      }
-    };
-    fetchChargeIds();
-  }, []);
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    if (name === 'chargenNr') {
-      setZogihortigeDaten(null);
-      setFormData(prev => ({
-        ...prev,
-        startzeit: '',
-        endzeit: '',
-        anzahlBloeckeGut: '',
-        anzahlBloeckeSchlecht: '',
-        anzahlBlocke: '',
-        lieferant: '',
-        sorte: ''
-      }));
-    }
-  };
-
-  const loadGehoerteDaten = async () => {
-    if (!formData.chargenNr) {
-      alert('Bitte wählen Sie eine ChargenNr aus!');
-      return;
-    }
-
-    setLoadingData(true);
-    try {
-      const response = await fetch(`http://4.245.3.186:5000/api/charge/${formData.chargenNr}`);
-      if (!response.ok) {
-        const errorData = await response.json();
-        alert(errorData.error || 'Fehler beim Laden der Daten');
-
-        setFormData(prev => ({
-          ...prev,
-          startzeit: '',
-          endzeit: '',
-          anzahlBlocke: '',
-          anzahlBloeckeGut: '',
-          anzahlBloeckeSchlecht: '',
-          lieferant: '',
-          sorte: ''
-        }));
-      } else {
-        const result = await response.json();
-
-        setFormData(prev => ({
-          ...prev,
-          startzeit: result.startzeit || '',
-          endzeit: result.endzeit || '',
-          anzahlBloeckeGut: result.anzahlBloeckeGut ?? '',
-          anzahlBloeckeSchlecht: result.anzahlBloeckeSchlecht ?? '',
-          anzahlBlocke: (Number(result.anzahlBloeckeGut) || 0) + (Number(result.anzahlBloeckeSchlecht) || 0),
-          lieferant: result.lieferant || '',
-          sorte: result.sorte || ''
-        }));
-      }
-    } catch (error) {
-      alert('Verbindungsfehler zum Server beim Laden der Daten');
-      console.error(error);
-    } finally {
-      setLoadingData(false);
-    }
-  };
 
   const fetchBlocks = async () => {
     if (!formData.chargenNr) {
@@ -174,7 +145,7 @@ function App() {
     }
     setLoadingBlocks(true);
     try {
-      const resp = await fetch(`http://4.245.3.186:5000/api/blocks/${formData.chargenNr}`);
+      const resp = await fetch(`http://4.245.3.186:5000/:5000/api/blocks/${formData.chargenNr}`);
       if (!resp.ok) throw new Error('Fehler beim Laden der Blocke');
       const data = await resp.json();
       setBlocks(data);
@@ -232,8 +203,8 @@ function App() {
 
     if (zogihortigeDaten) {
       y += 15;
-      pdf.setFontSize(12);
-      pdf.setTextColor(0, 0, 0);
+      pdf.setFontSize(14);
+      pdf.setTextColor('#0d6efd');
       pdf.text('Zugihörige Daten', leftMargin, y);
       y += 15;
 
@@ -253,13 +224,13 @@ function App() {
 
       fields.forEach((field) => {
 
-        pdf.setFontSize(12);
-        pdf.setTextColor(0, 0, 0);
+        pdf.setFontSize(11);
+        pdf.setTextColor('#0d6efd');
         pdf.setFont(undefined, 'bold');
         pdf.text(`${field.label} :`, leftMargin, y);
 
 
-        pdf.setFontSize(12);
+        pdf.setFontSize(11);
         pdf.setTextColor('#000000');
         pdf.setFont(undefined, 'normal');
         pdf.text(field.value, leftMargin + 40, y);
@@ -276,7 +247,13 @@ function App() {
     pdf.save(`ChargenNr_${formData.chargenNr || 'Bericht'}.pdf`);
   };
 
+  // Nouvelle fonction pour gérer le clic sur le bouton de la ligne
+  const handleBlockClick = (blockId) => {
+    // Ici tu peux faire la redirection, par exemple :
+    // window.location.href = `/blocks/${blockId}`;
+    alert(`Bouton cliqué pour blockId: ${blockId}`);
 
+  };
 
 
 
@@ -292,47 +269,55 @@ function App() {
                 <h3 className="mb-0">🔧 Chargen Monitor</h3>
               </div>
               <div className="card-body">
-                <div className="mb-3">
-                  <label className="form-label fw-semibold">ChargenNr auswählen</label>
-                  <select
-                    className="form-select"
-                    name="chargenNr"
-                    value={formData.chargenNr}
-                    onChange={handleChange}
-                    disabled={loadingIds}
-                  >
-                    <option value="">-- Bitte wählen --</option>
-                    {chargeIds.map((id) => (
-                      <option key={id} value={id}>
-                        {id}
-                      </option>
-                    ))}
-                  </select>
-                </div>
 
+                {/* Startzeit & Endzeit (à remplir manuellement) */}
                 <div className="row mb-3">
                   <div className="col">
                     <label className="form-label fw-semibold">Startzeit</label>
-                    <input
-                      type="datetime-local"
-                      className="form-control"
-                      name="startzeit"
-                      value={toDateTimeLocal(formData.startzeit)}
-                      readOnly
-                    />
+                    <select
+                      className="form-select"
+                      value={formData.startzeit}
+                      onChange={(e) => setFormData({ ...formData, startzeit: e.target.value })}
+                    >
+                      <option value="">Startzeit wählen</option>
+                      {zeitPaare.map((zp, idx) => (
+                        <option key={idx} value={zp.Startzeit}>
+                          {new Date(zp.Startzeit).toLocaleString()}
+                        </option>
+                      ))}
+                    </select>
                   </div>
+
                   <div className="col">
                     <label className="form-label fw-semibold">Endzeit</label>
+                    <select
+                      className="form-select"
+                      value={formData.endzeit}
+                      onChange={(e) => setFormData({ ...formData, endzeit: e.target.value })}
+                    >
+                      <option value="">Endzeit wählen</option>
+                      {zeitPaare.map((zp, idx) => (
+                        <option key={idx} value={zp.Endzeit}>
+                          {new Date(zp.Endzeit).toLocaleString()}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+
+                {/* ChargeID, Lieferant, Sorte */}
+                <div className="row mb-3">
+                  <div className="col">
+                    <label className="form-label fw-semibold">ChargeID</label>
                     <input
-                      type="datetime-local"
+                      type="text"
                       className="form-control"
-                      name="endzeit"
-                      value={toDateTimeLocal(formData.endzeit)}
+                      name="chargenNr"
+                      value={formData.chargenNr}
                       readOnly
                     />
                   </div>
-                </div>
-                <div className="row mb-3">
                   <div className="col">
                     <label className="form-label fw-semibold">Lieferant</label>
                     <input
@@ -355,17 +340,8 @@ function App() {
                   </div>
                 </div>
 
+                {/* Blöcke Gut, Schlecht, Gesamt */}
                 <div className="row mb-3">
-                  <div className="col">
-                    <label className="form-label fw-semibold">Blöcke Schlecht</label>
-                    <input
-                      type="number"
-                      className="form-control"
-                      name="anzahlBloeckeSchlecht"
-                      value={formData.anzahlBloeckeSchlecht}
-                      readOnly
-                    />
-                  </div>
                   <div className="col">
                     <label className="form-label fw-semibold">Blöcke Gut</label>
                     <input
@@ -373,6 +349,16 @@ function App() {
                       className="form-control"
                       name="anzahlBloeckeGut"
                       value={formData.anzahlBloeckeGut}
+                      readOnly
+                    />
+                  </div>
+                  <div className="col">
+                    <label className="form-label fw-semibold">Blöcke Schlecht</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      name="anzahlBloeckeSchlecht"
+                      value={formData.anzahlBloeckeSchlecht}
                       readOnly
                     />
                   </div>
@@ -387,14 +373,16 @@ function App() {
                     />
                   </div>
                 </div>
+
               </div>
+
 
 
               <div className="mb-3 d-flex gap-3">
                 <button
                   className="btn btn-outline-primary flex-grow-1"
                   onClick={loadGehoerteDaten}
-                  disabled={loadingData || loadingIds || !formData.chargenNr}
+                  disabled={loadingData || !formData.startzeit || !formData.endzeit}
                 >
                   {loadingData ? 'Lädt...' : 'Daten laden'}
                 </button>
@@ -413,7 +401,7 @@ function App() {
                   onClick={fetchZogihortigeDaten}
                   disabled={loadingZogihortige || !formData.chargenNr}
                 >
-                  {loadingZogihortige ? 'Lädt...' : 'Zugehörige Daten'}
+                  {loadingZogihortige ? 'Lädt...' : ' Daten Anzeigen'}
                 </button>
               </div>
 
@@ -422,21 +410,20 @@ function App() {
                 <div className="mt-4">
                   <h5 className="mb-3" style={{ textDecoration: 'underline' }}>
                     <i className="bi bi-database me-2"></i>Zugehörige Daten für Charge {formData.chargenNr} : </h5>
-
                   <div className="table-responsive">
                     <table className="table table-bordered table-striped">
                       <thead className="table-primary">
                         <tr>
+                          <th>ChargeNr</th>
                           <th>NummerPanter</th>
                           <th>Bezeichnung</th>
-                          <th>Startzeit</th>
-                          <th>Endzeit</th>
+
                           <th>Blöcke Gut</th>
                           <th>Blöcke Schlecht</th>
                           <th>Blöcke Gesamt</th>
                           <th>Lieferant</th>
                           <th>Sorte</th>
-
+                          <th>Aktion</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -454,7 +441,6 @@ function App() {
 
 
 
-
                         </tr>
                       </tbody>
                     </table>
@@ -468,14 +454,13 @@ function App() {
                   onClick={fetchBlocks}
                   disabled={loadingBlocks || !formData.chargenNr}
                 >
-                  {loadingBlocks ? 'Lädt...' : 'Zugehörige Blöcke '}
+                  {loadingBlocks ? 'Lädt...' : 'Zugehörige Blocke'}
                 </button>
               </div>
               {blocks.length > 0 && (
                 <div className="mt-4">
                   <h5 className="mb-3" style={{ textDecoration: 'underline' }}>
                     <i className="bi bi-box-seam me-2"></i>Blöcke für Charge {formData.chargenNr} :</h5>
-
                   <div className="table-responsive">
                     <table className="table table-bordered table-striped">
                       <thead className="table-secondary">
@@ -484,33 +469,36 @@ function App() {
                           <th>schlecht</th>
                           <th>Startzeit</th>
                           <th>Endzeit</th>
-                          <th>Aktion</th>
-
+                          <th>Details</th> {/* Colonne du bouton */}
                         </tr>
                       </thead>
                       <tbody>
                         {blocks.map((blk) => (
                           <tr
                             key={blk.BlockID}
-                            className={blk.schlecht === 1 ? 'table-danger' : ''}
+                            className={blk.schlecht === 1 ? "table-danger" : ""}
                           >
                             <td>{blk.BlockID}</td>
                             <td>{blk.schlecht}</td>
                             <td>{formatDateTime(blk.Startzeit)}</td>
                             <td>{formatDateTime(blk.Endzeit)}</td>
                             <td>
-                              <button className="btn btn-success btn-sm">
-                                <i className="bi bi-eye"></i> Details
-                              </button>
+                              <a
+                                href={`/details/${blk.BlockID}`}
+                                className="btn btn-success btn-sm"
+                              >
+                                Details
+                              </a>
                             </td>
                           </tr>
                         ))}
                       </tbody>
-
                     </table>
                   </div>
                 </div>
               )}
+
+
 
 
             </div>
