@@ -12,9 +12,11 @@ function formatDateTime(dateTimeStr) {
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
+    second: '2-digit',
     hour12: false,
   });
 }
+
 
 function toDateTimeLocal(dateTimeStr) {
   if (!dateTimeStr) return '';
@@ -145,7 +147,7 @@ function App() {
     }
     setLoadingBlocks(true);
     try {
-      const resp = await fetch(`http://4.245.3.186:5000/:5000/api/blocks/${formData.chargenNr}`);
+      const resp = await fetch(`http://4.245.3.186:5000/api/blocks/${formData.chargenNr}`);
       if (!resp.ok) throw new Error('Fehler beim Laden der Blocke');
       const data = await resp.json();
       setBlocks(data);
@@ -271,40 +273,28 @@ function App() {
               <div className="card-body">
 
                 {/* Startzeit & Endzeit (à remplir manuellement) */}
-                <div className="row mb-3">
+                < div className="row mb-3">
                   <div className="col">
                     <label className="form-label fw-semibold">Startzeit</label>
-                    <select
-                      className="form-select"
+                    <input
+                      type="datetime-local"
+                      className="form-control"
                       value={formData.startzeit}
                       onChange={(e) => setFormData({ ...formData, startzeit: e.target.value })}
-                    >
-                      <option value="">Startzeit wählen</option>
-                      {zeitPaare.map((zp, idx) => (
-                        <option key={idx} value={zp.Startzeit}>
-                          {new Date(zp.Startzeit).toLocaleString()}
-                        </option>
-                      ))}
-                    </select>
+                      step="1"
+                    />
                   </div>
-
                   <div className="col">
                     <label className="form-label fw-semibold">Endzeit</label>
-                    <select
-                      className="form-select"
+                    <input
+                      type="datetime-local"
+                      className="form-control"
                       value={formData.endzeit}
                       onChange={(e) => setFormData({ ...formData, endzeit: e.target.value })}
-                    >
-                      <option value="">Endzeit wählen</option>
-                      {zeitPaare.map((zp, idx) => (
-                        <option key={idx} value={zp.Endzeit}>
-                          {new Date(zp.Endzeit).toLocaleString()}
-                        </option>
-                      ))}
-                    </select>
+                      step="1"
+                    />
                   </div>
                 </div>
-
 
                 {/* ChargeID, Lieferant, Sorte */}
                 <div className="row mb-3">
@@ -417,17 +407,19 @@ function App() {
                           <th>ChargeNr</th>
                           <th>NummerPanter</th>
                           <th>Bezeichnung</th>
-
+                          <th>Startzeit</th>
+                          <th>Endzeit</th>
                           <th>Blöcke Gut</th>
                           <th>Blöcke Schlecht</th>
                           <th>Blöcke Gesamt</th>
                           <th>Lieferant</th>
                           <th>Sorte</th>
-                          <th>Aktion</th>
+                          
                         </tr>
                       </thead>
                       <tbody>
                         <tr>
+                          <td>{zogihortigeDaten.nummerPanter || '-'}</td>
                           <td>{zogihortigeDaten.nummerPanter || '-'}</td>
                           <td>{zogihortigeDaten.bezeichnung || '-'}</td>
                           <td>{formatDateTime(zogihortigeDaten.startzeit)}</td>
