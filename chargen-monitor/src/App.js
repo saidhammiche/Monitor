@@ -5,25 +5,18 @@ import 'bootstrap-icons/font/bootstrap-icons.css';
 
 function formatDateTime(dateTimeStr) {
   if (!dateTimeStr) return '-';
-  const date = new Date(dateTimeStr);
-  return date.toLocaleString('de-DE', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  });
+
+  // Nettoyer la chaîne : supprimer les millisecondes et le Z éventuel
+  const cleaned = dateTimeStr.replace('Z', '').split('.')[0];
+
+  // Remplacer le T par un espace
+  return cleaned.replace('T', ' ');
 }
 
 
-function toDateTimeLocal(dateTimeStr) {
-  if (!dateTimeStr) return '';
-  const date = new Date(dateTimeStr);
-  const isoString = date.toISOString();
-  return isoString.substring(0, 16);
-}
+
+
+
 
 function App() {
   const [chargeIds, setChargeIds] = useState([]);
@@ -204,11 +197,11 @@ function App() {
 
 
     if (zogihortigeDaten) {
-      y += 15;
+      y += 10;
       pdf.setFontSize(14);
-      pdf.setTextColor('#0d6efd');
+      pdf.setTextColor('#495057');
       pdf.text('Zugihörige Daten', leftMargin, y);
-      y += 15;
+      y += 10;
 
 
       const fields = [
@@ -227,7 +220,7 @@ function App() {
       fields.forEach((field) => {
 
         pdf.setFontSize(11);
-        pdf.setTextColor('#0d6efd');
+        pdf.setTextColor('#495057');
         pdf.setFont(undefined, 'bold');
         pdf.text(`${field.label} :`, leftMargin, y);
 
@@ -248,14 +241,14 @@ function App() {
 
     pdf.save(`ChargenNr_${formData.chargenNr || 'Bericht'}.pdf`);
   };
-
-  // Nouvelle fonction pour gérer le clic sur le bouton de la ligne
-  const handleBlockClick = (blockId) => {
-    // Ici tu peux faire la redirection, par exemple :
-    // window.location.href = `/blocks/${blockId}`;
-    alert(`Bouton cliqué pour blockId: ${blockId}`);
-
+  const handleBlockClick = (block) => {
+    if (block.link) {
+      window.location.href = block.link;
+    } else {
+      alert("Lien non disponible pour ce bloc.");
+    }
   };
+
 
 
 
@@ -370,12 +363,13 @@ function App() {
 
               <div className="mb-3 d-flex gap-3">
                 <button
-                  className="btn btn-outline-primary flex-grow-1"
+                  className="btn btn-outline-primary flex-grow-1 ms-2"
                   onClick={loadGehoerteDaten}
                   disabled={loadingData || !formData.startzeit || !formData.endzeit}
                 >
                   {loadingData ? 'Lädt...' : 'Daten laden'}
                 </button>
+
 
                 <button
                   className="btn btn-primary flex-grow-1"
@@ -387,12 +381,13 @@ function App() {
                 </button>
 
                 <button
-                  className="btn btn-outline-info flex-grow-1"
+                  className="btn btn-outline-info flex-grow-1 me-2"
                   onClick={fetchZogihortigeDaten}
                   disabled={loadingZogihortige || !formData.chargenNr}
                 >
-                  {loadingZogihortige ? 'Lädt...' : ' Daten Anzeigen'}
+                  {loadingZogihortige ? 'Lädt...' : 'Daten Anzeigen'}
                 </button>
+
               </div>
 
               {/* Tableau des données zogihortigeDaten avec ligne rouge si anzahlBloeckeSchlecht === 1 */}
@@ -414,7 +409,7 @@ function App() {
                           <th>Blöcke Gesamt</th>
                           <th>Lieferant</th>
                           <th>Sorte</th>
-                          
+
                         </tr>
                       </thead>
                       <tbody>
@@ -442,12 +437,14 @@ function App() {
 
               <div className="mb-3 d-flex gap-3">
                 <button
-                  className="btn btn-outline-secondary flex-grow-1"
+                  className="btn btn-outline-secondary flex-grow-1 mx-2 d-flex align-items-center justify-content-center gap-2"
                   onClick={fetchBlocks}
                   disabled={loadingBlocks || !formData.chargenNr}
                 >
-                  {loadingBlocks ? 'Lädt...' : 'Zugehörige Blocke'}
+                  <i className="bi bi-box-seam"></i>
+                  {loadingBlocks ? 'Lädt...' : 'Zugehörige Blöcke'}
                 </button>
+
               </div>
               {blocks.length > 0 && (
                 <div className="mt-4">
@@ -475,12 +472,15 @@ function App() {
                             <td>{formatDateTime(blk.Startzeit)}</td>
                             <td>{formatDateTime(blk.Endzeit)}</td>
                             <td>
-                              <a
-                                href={`/details/${blk.BlockID}`}
-                                className="btn btn-success btn-sm"
+                              <button
+                                className="btn btn-outline-success d-flex align-items-center gap-2"
+                                onClick={() => handleBlockClick(blk)}
                               >
+                                <i className="bi bi-gear-fill"></i>
                                 Details
-                              </a>
+                              </button>
+
+
                             </td>
                           </tr>
                         ))}

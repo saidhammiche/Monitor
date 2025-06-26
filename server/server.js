@@ -134,7 +134,7 @@ app.get('/api/blocks/:id', async (req, res) => {
     const result = await pool.request()
       .input('id', sql.VarChar, id)
       .query(`
-        SELECT BlockID, schlecht, Startzeit, Endzeit
+        SELECT BlockID, schlecht, Startzeit, Endzeit, link
         FROM FE_ViewBlock
         WHERE ChargeID = @id
       `);
