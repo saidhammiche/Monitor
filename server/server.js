@@ -70,7 +70,7 @@ app.get('/api/charges', async (req, res) => {
           AnzahlBloeckeSchlecht,
           ISNULL(AnzahlBloeckeGut, 0) + ISNULL(AnzahlBloeckeSchlecht, 0) AS GesamtBlocke
         FROM FE_Charge
-        WHERE Startzeit >= @start AND Endzeit <= @end
+        WHERE Startzeit = @start AND Endzeit = @end
         ORDER BY Startzeit ASC
       `);
 
