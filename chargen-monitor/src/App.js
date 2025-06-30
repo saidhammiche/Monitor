@@ -1,25 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { jsPDF } from 'jspdf';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 
 function formatDateTime(dateTimeStr) {
   if (!dateTimeStr) return '-';
-
-  // Nettoyer la chaîne : supprimer les millisecondes et le Z éventuel
   const cleaned = dateTimeStr.replace('Z', '').split('.')[0];
-
-  // Remplacer le T par un espace
   return cleaned.replace('T', ' ');
 }
 
-
-
-
-
-
 function App() {
-  const [chargeIds, setChargeIds] = useState([]);
   const [formData, setFormData] = useState({
     chargenNr: '',
     startzeit: '',
@@ -31,117 +21,60 @@ function App() {
     sorte: ''
   });
 
-  const [loadingIds, setLoadingIds] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
-
   const [zogihortigeDaten, setZogihortigeDaten] = useState(null);
-  const [loadingZogihortige, setLoadingZogihortige] = useState(false);
   const [blocks, setBlocks] = useState([]);
   const [loadingBlocks, setLoadingBlocks] = useState(false);
-  const [zeitPaare, setZeitPaare] = useState([]);
-
-  useEffect(() => {
-    const fetchZeitPaare = async () => {
-      try {
-        const response = await fetch('http://4.245.3.186:5000/api/zeitpaare');
-        const data = await response.json();
-        setZeitPaare(data);
-      } catch (error) {
-        console.error('Fehler beim Laden der Zeitpaare', error);
-      }
-    };
-
-    fetchZeitPaare();
-  }, []);
-
-
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-    if (name === 'chargenNr') {
-      setZogihortigeDaten(null);
-      setFormData(prev => ({
-        ...prev,
-        startzeit: '',
-        endzeit: '',
-        anzahlBloeckeGut: '',
-        anzahlBloeckeSchlecht: '',
-        anzahlBlocke: '',
-        lieferant: '',
-        sorte: ''
-      }));
-    }
   };
 
-  const loadGehoerteDaten = async () => {
-    const { startzeit, endzeit } = formData;
-
-    if (!startzeit || !endzeit) {
-      alert('Bitte wählen Sie Startzeit und Endzeit aus!');
+  const loadChargeData = async () => {
+    if (!formData.chargenNr) {
+      alert('Bitte geben Sie eine ChargeID ein!');
       return;
     }
 
     setLoadingData(true);
     try {
-      const response = await fetch(`http://4.245.3.186:5000/api/charges?startzeit=${encodeURIComponent(startzeit)}&endzeit=${encodeURIComponent(endzeit)}`);
-      const result = await response.json();
-
+      const response = await fetch(`http://4.245.3.186:5000/api/efcharge/${formData.chargenNr}`);
       if (!response.ok) {
-        alert(result.error || 'Fehler beim Laden der Daten');
-        return;
+        throw new Error('Charge nicht gefunden');
       }
+      const data = await response.json();
 
       setFormData(prev => ({
         ...prev,
-        chargenNr: result.chargenNr || '',
-        lieferant: result.lieferant || '',
-        sorte: result.sorte || '',
-        anzahlBloeckeGut: result.anzahlBloeckeGut ?? '',
-        anzahlBloeckeSchlecht: result.anzahlBloeckeSchlecht ?? '',
-        anzahlBlocke: (Number(result.anzahlBloeckeGut) || 0) + (Number(result.anzahlBloeckeSchlecht) || 0),
+        chargenNr: data.chargenNr,
+        startzeit: data.startzeit,
+        endzeit: data.endzeit,
+        anzahlBloeckeGut: data.anzahlBloeckeGut,
+        anzahlBloeckeSchlecht: data.anzahlBloeckeSchlecht,
+        anzahlBlocke: data.anzahlBlocke,
+        lieferant: data.lieferant,
+        sorte: data.sorte
       }));
 
+      // Ne plus mettre à jour zogihortigeDaten ici
     } catch (error) {
-      alert('Verbindungsfehler zum Server beim Laden der Daten');
+      alert(error.message);
       console.error(error);
     } finally {
       setLoadingData(false);
     }
   };
 
-  const fetchZogihortigeDaten = async () => {
-    if (!formData.chargenNr) {
-      alert('Bitte wählen Sie zuerst eine ChargenNr aus!');
-      return;
-    }
-
-    setLoadingZogihortige(true);
-    try {
-      const response = await fetch(`http://4.245.3.186:5000/api/efcharge/${formData.chargenNr}`);
-      if (!response.ok) {
-        throw new Error('Fehler beim Laden der Daten');
-      }
-      const data = await response.json();
-      setZogihortigeDaten(data);
-    } catch (error) {
-      alert(error.message);
-      console.error(error);
-    } finally {
-      setLoadingZogihortige(false);
-    }
-  };
-
-
   const fetchBlocks = async () => {
     if (!formData.chargenNr) {
-      alert('Bitte wählen Sie zuerst eine ChargenNr aus!');
+      alert('Bitte geben Sie eine ChargeID ein!');
       return;
     }
     setLoadingBlocks(true);
     try {
       const resp = await fetch(`http://4.245.3.186:5000/api/blocks/${formData.chargenNr}`);
-      if (!resp.ok) throw new Error('Fehler beim Laden der Blocke');
+      if (!resp.ok) throw new Error('Fehler beim Laden der Blöcke');
       const data = await resp.json();
       setBlocks(data);
     } catch (e) {
@@ -158,7 +91,7 @@ function App() {
     let y = 20;
 
     pdf.setFontSize(18);
-    pdf.setTextColor('#0d6efd');
+    pdf.setTextColor('#3b7695');
     pdf.text('Chargen Monitor Bericht', pdf.internal.pageSize.getWidth() / 2, y, { align: 'center' });
     y += 15;
 
@@ -169,7 +102,7 @@ function App() {
     pdf.text(`Erstellt am: ${dateStr}`, leftMargin, y);
     y += 10;
 
-    pdf.setDrawColor('#0d6efd');
+    pdf.setDrawColor('#3b7695');
     pdf.setLineWidth(0.5);
     pdf.line(leftMargin, y, pdf.internal.pageSize.getWidth() - leftMargin, y);
     y += 10;
@@ -193,47 +126,6 @@ function App() {
     printField('Lieferant', formData.lieferant);
     printField('Sorte', formData.sorte);
 
-
-
-
-    if (zogihortigeDaten) {
-      y += 10;
-      pdf.setFontSize(14);
-      pdf.setTextColor('#495057');
-      pdf.text('Zugihörige Daten', leftMargin, y);
-      y += 10;
-
-
-      const fields = [
-        { label: 'NummerPanter', value: zogihortigeDaten.nummerPanter || '-' },
-        { label: 'Bezeichnung', value: zogihortigeDaten.bezeichnung || '-' },
-        { label: 'Start', value: formatDateTime(zogihortigeDaten.startzeit) },
-        { label: 'Ende', value: formatDateTime(zogihortigeDaten.endzeit) },
-        { label: 'BlokOk', value: zogihortigeDaten.anzahlBloeckeGut?.toString() || '0' },
-        { label: 'BlokSchlecht', value: zogihortigeDaten.anzahlBloeckeSchlecht?.toString() || '0' },
-        { label: 'Gesamt', value: zogihortigeDaten.anzahlBlocke?.toString() || '0' },
-        { label: 'Lieferant', value: zogihortigeDaten.lieferant || '-' },
-        { label: 'Sorte', value: zogihortigeDaten.sorte || '-' }
-      ];
-
-
-      fields.forEach((field) => {
-
-        pdf.setFontSize(11);
-        pdf.setTextColor('#495057');
-        pdf.setFont(undefined, 'bold');
-        pdf.text(`${field.label} :`, leftMargin, y);
-
-
-        pdf.setFontSize(11);
-        pdf.setTextColor('#000000');
-        pdf.setFont(undefined, 'normal');
-        pdf.text(field.value, leftMargin + 40, y);
-
-        y += 10;
-      });
-    }
-
     y += 10;
     pdf.setFontSize(9);
     pdf.setTextColor('#6c757d');
@@ -241,180 +133,211 @@ function App() {
 
     pdf.save(`ChargenNr_${formData.chargenNr || 'Bericht'}.pdf`);
   };
+
   const handleBlockClick = (block) => {
     if (block.link) {
-      window.location.href = block.link;
+      window.open(block.link, '_blank');
     } else {
       alert("Lien non disponible pour ce bloc.");
     }
   };
 
-
-
-
   return (
-    <>
-
-
-      <div className="container py-5">
-        <div className="row justify-content-center">
-          <div className="col-md-8">
-            <div className="card shadow-lg rounded-4 border-0">
-              <div className="card-header bg-primary text-white rounded-top-4 d-flex justify-content-between align-items-center">
-                <h3 className="mb-0">🔧 Chargen Monitor</h3>
-              </div>
-              <div className="card-body">
-
-                {/* Startzeit & Endzeit (à remplir manuellement) */}
-                < div className="row mb-3">
-                  <div className="col">
-                    <label className="form-label fw-semibold">Startzeit</label>
-                    <input
-                      type="datetime-local"
-                      className="form-control"
-                      value={formData.startzeit}
-                      onChange={(e) => setFormData({ ...formData, startzeit: e.target.value })}
-                      step="1"
-                    />
-                  </div>
-                  <div className="col">
-                    <label className="form-label fw-semibold">Endzeit</label>
-                    <input
-                      type="datetime-local"
-                      className="form-control"
-                      value={formData.endzeit}
-                      onChange={(e) => setFormData({ ...formData, endzeit: e.target.value })}
-                      step="1"
-                    />
-                  </div>
+    <div className="container py-5">
+      <div className="row justify-content-center">
+        <div className="col-md-8">
+          <div className="card shadow-lg rounded-4 border-0">
+            <div className="card-header text-white rounded-top-4 d-flex justify-content-between align-items-center"
+              style={{ backgroundColor: '#3b7695', borderColor: '#3b7695' }}>
+              <h3 className="mb-0">🔧 Chargen Monitor</h3>
+            </div>
+            <div className="card-body">
+              <div className="row mb-3">
+                <div className="col">
+                  <label className="form-label fw-semibold">ChargeID</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    name="chargenNr"
+                    value={formData.chargenNr}
+                    onChange={handleChange}
+                  />
                 </div>
-
-                {/* ChargeID, Lieferant, Sorte */}
-                <div className="row mb-3">
-                  <div className="col">
-                    <label className="form-label fw-semibold">ChargeID</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      name="chargenNr"
-                      value={formData.chargenNr}
-                      readOnly
-                    />
-                  </div>
-                  <div className="col">
-                    <label className="form-label fw-semibold">Lieferant</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      name="lieferant"
-                      value={formData.lieferant}
-                      readOnly
-                    />
-                  </div>
-                  <div className="col">
-                    <label className="form-label fw-semibold">Sorte</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      name="sorte"
-                      value={formData.sorte}
-                      readOnly
-                    />
-                  </div>
+                <div className="col-auto d-flex align-items-end">
+                  <button
+                    className="btn"
+                    onClick={loadChargeData}
+                    disabled={loadingData}
+                    style={{
+                      backgroundColor: '#3b7695',
+                      borderColor: '#3b7695',
+                      color: 'white'
+                    }}
+                  >
+                    {loadingData ? 'Lädt...' : 'Daten laden'}
+                  </button>
                 </div>
-
-                {/* Blöcke Gut, Schlecht, Gesamt */}
-                <div className="row mb-3">
-                  <div className="col">
-                    <label className="form-label fw-semibold">Blöcke Gut</label>
-                    <input
-                      type="number"
-                      className="form-control"
-                      name="anzahlBloeckeGut"
-                      value={formData.anzahlBloeckeGut}
-                      readOnly
-                    />
-                  </div>
-                  <div className="col">
-                    <label className="form-label fw-semibold">Blöcke Schlecht</label>
-                    <input
-                      type="number"
-                      className="form-control"
-                      name="anzahlBloeckeSchlecht"
-                      value={formData.anzahlBloeckeSchlecht}
-                      readOnly
-                    />
-                  </div>
-                  <div className="col">
-                    <label className="form-label fw-semibold">Blöcke Gesamt</label>
-                    <input
-                      type="number"
-                      className="form-control"
-                      name="anzahlBlocke"
-                      value={formData.anzahlBlocke}
-                      readOnly
-                    />
-                  </div>
-                </div>
-
               </div>
 
+              <div className="row mb-3">
+                <div className="col">
+                  <label className="form-label fw-semibold">Startzeit</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={formatDateTime(formData.startzeit)}
+                    readOnly
+                  />
+                </div>
+                <div className="col">
+                  <label className="form-label fw-semibold">Endzeit</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={formatDateTime(formData.endzeit)}
+                    readOnly
+                  />
+                </div>
+              </div>
 
+              <div className="row mb-3">
+                <div className="col">
+                  <label className="form-label fw-semibold">Lieferant</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    name="lieferant"
+                    value={formData.lieferant}
+                    readOnly
+                  />
+                </div>
+                <div className="col">
+                  <label className="form-label fw-semibold">Sorte</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    name="sorte"
+                    value={formData.sorte}
+                    readOnly
+                  />
+                </div>
+              </div>
+
+              <div className="row mb-3">
+                <div className="col">
+                  <label className="form-label fw-semibold">Blöcke Gut</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    name="anzahlBloeckeGut"
+                    value={formData.anzahlBloeckeGut}
+                    readOnly
+                  />
+                </div>
+                <div className="col">
+                  <label className="form-label fw-semibold">Blöcke Schlecht</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    name="anzahlBloeckeSchlecht"
+                    value={formData.anzahlBloeckeSchlecht}
+                    readOnly
+                  />
+                </div>
+                <div className="col">
+                  <label className="form-label fw-semibold">Blöcke Gesamt</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    name="anzahlBlocke"
+                    value={formData.anzahlBlocke}
+                    readOnly
+                  />
+                </div>
+              </div>
 
               <div className="mb-3 d-flex gap-3">
                 <button
-                  className="btn btn-outline-primary flex-grow-1 ms-2"
-                  onClick={loadGehoerteDaten}
-                  disabled={loadingData || !formData.startzeit || !formData.endzeit}
-                >
-                  {loadingData ? 'Lädt...' : 'Daten laden'}
-                </button>
-
-
-                <button
-                  className="btn btn-primary flex-grow-1"
+                  className="btn flex-grow-1"
                   onClick={generatePDF}
-                  disabled={loadingData || loadingIds || !formData.chargenNr}
+                  disabled={!formData.chargenNr}
+                  style={{
+                    backgroundColor: '#3b7695',
+                    borderColor: '#3b7695',
+                    color: 'white'
+                  }}
                 >
                   <i className="bi bi-file-earmark-pdf-fill me-2"></i>
                   PDF herunterladen
                 </button>
 
+
                 <button
-                  className="btn btn-outline-info flex-grow-1 me-2"
-                  onClick={fetchZogihortigeDaten}
-                  disabled={loadingZogihortige || !formData.chargenNr}
+                  className="btn flex-grow-1"
+                  onClick={async () => {
+                    if (!formData.chargenNr) {
+                      alert('Bitte geben Sie eine ChargeID ein!');
+                      return;
+                    }
+                    try {
+                      const response = await fetch(`http://4.245.3.186:5000/api/efcharge/${formData.chargenNr}`);
+                      if (!response.ok) throw new Error('Daten nicht gefunden');
+                      const data = await response.json();
+                      setZogihortigeDaten(data);
+                    } catch (error) {
+                      alert(error.message);
+                    }
+                  }}
+                  disabled={!formData.chargenNr}
+                  style={{
+                    backgroundColor: '#3b7695',
+                    borderColor: '#3b7695',
+                    color: 'white'
+                  }}
                 >
-                  {loadingZogihortige ? 'Lädt...' : 'Daten Anzeigen'}
+                  <i className="bi bi-eye-fill me-2"></i>
+                  Daten Anzeigen
                 </button>
 
+                <button
+                  className="btn flex-grow-1 d-flex align-items-center justify-content-center gap-2"
+                  style={{
+                    backgroundColor: '#3b7695',
+                    borderColor: '#3b7695',
+                    color: 'white'
+                  }} onClick={fetchBlocks}
+                  disabled={loadingBlocks || !formData.chargenNr}
+
+                >
+                  <i className="bi bi-box-seam"></i>
+                  {loadingBlocks ? 'Lädt...' : 'Blöcke anzeigen'}
+                </button>
               </div>
 
-              {/* Tableau des données zogihortigeDaten avec ligne rouge si anzahlBloeckeSchlecht === 1 */}
               {zogihortigeDaten && (
                 <div className="mt-4">
                   <h5 className="mb-3" style={{ textDecoration: 'underline' }}>
-                    <i className="bi bi-database me-2"></i>Zugehörige Daten für Charge {formData.chargenNr} : </h5>
+                    <i className="bi bi-database me-2"></i>Zugehörige Daten für Charge {formData.chargenNr} :
+                  </h5>
                   <div className="table-responsive">
                     <table className="table table-bordered table-striped">
                       <thead className="table-primary">
                         <tr>
-                          <th>ChargeNr</th>
+                          <th>ChargeID</th>
                           <th>NummerPanter</th>
                           <th>Bezeichnung</th>
                           <th>Startzeit</th>
                           <th>Endzeit</th>
                           <th>Blöcke Gut</th>
                           <th>Blöcke Schlecht</th>
-                          <th>Blöcke Gesamt</th>
+                          <th>Gesamt</th>
                           <th>Lieferant</th>
                           <th>Sorte</th>
-
                         </tr>
                       </thead>
                       <tbody>
                         <tr>
-                          <td>{zogihortigeDaten.nummerPanter || '-'}</td>
+                          <td>{zogihortigeDaten.chargenNr || '-'}</td>
                           <td>{zogihortigeDaten.nummerPanter || '-'}</td>
                           <td>{zogihortigeDaten.bezeichnung || '-'}</td>
                           <td>{formatDateTime(zogihortigeDaten.startzeit)}</td>
@@ -424,10 +347,6 @@ function App() {
                           <td>{zogihortigeDaten.anzahlBlocke || '0'}</td>
                           <td>{zogihortigeDaten.lieferant || '-'}</td>
                           <td>{zogihortigeDaten.sorte || '-'}</td>
-
-
-
-
                         </tr>
                       </tbody>
                     </table>
@@ -435,21 +354,11 @@ function App() {
                 </div>
               )}
 
-              <div className="mb-3 d-flex gap-3">
-                <button
-                  className="btn btn-outline-secondary flex-grow-1 mx-2 d-flex align-items-center justify-content-center gap-2"
-                  onClick={fetchBlocks}
-                  disabled={loadingBlocks || !formData.chargenNr}
-                >
-                  <i className="bi bi-box-seam"></i>
-                  {loadingBlocks ? 'Lädt...' : 'Zugehörige Blöcke'}
-                </button>
-
-              </div>
               {blocks.length > 0 && (
                 <div className="mt-4">
                   <h5 className="mb-3" style={{ textDecoration: 'underline' }}>
-                    <i className="bi bi-box-seam me-2"></i>Blöcke für Charge {formData.chargenNr} :</h5>
+                    <i className="bi bi-box-seam me-2"></i>Blöcke für Charge {formData.chargenNr} :
+                  </h5>
                   <div className="table-responsive">
                     <table className="table table-bordered table-striped">
                       <thead className="table-secondary">
@@ -458,7 +367,7 @@ function App() {
                           <th>schlecht</th>
                           <th>Startzeit</th>
                           <th>Endzeit</th>
-                          <th>Details</th> {/* Colonne du bouton */}
+                          <th>Details</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -475,12 +384,15 @@ function App() {
                               <button
                                 className="btn btn-outline-success d-flex align-items-center gap-2"
                                 onClick={() => handleBlockClick(blk)}
+                                style={{
+                                  backgroundColor: '#3b7695',
+                                  borderColor: '#3b7695',
+                                  color: 'white'
+                                }}
                               >
                                 <i className="bi bi-gear-fill"></i>
                                 Details
                               </button>
-
-
                             </td>
                           </tr>
                         ))}
@@ -489,16 +401,11 @@ function App() {
                   </div>
                 </div>
               )}
-
-
-
-
             </div>
           </div>
         </div>
       </div>
-
-    </>
+    </div>
   );
 }
 
