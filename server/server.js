@@ -29,7 +29,16 @@ async function getPool() {
   return pool;
 }
 
-// Route pour récupérer les détails d'une charge par son ID (déjà existante)
+
+
+
+
+
+
+
+
+// 🔹 Route: Variante EF de la charge
+
 app.get('/api/efcharge/:id', async (req, res) => {
   const id = req.params.id;
   try {
