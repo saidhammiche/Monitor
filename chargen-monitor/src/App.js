@@ -296,7 +296,7 @@ function App() {
                   }}
                 >
                   <i className="bi bi-eye-fill me-2"></i>
-                  Daten Anzeigen
+                  Chargen Anzeigen
                 </button>
 
                 <button
@@ -310,7 +310,7 @@ function App() {
 
                 >
                   <i className="bi bi-box-seam"></i>
-                  {loadingBlocks ? 'Lädt...' : 'Blöcke anzeigen'}
+                  {loadingBlocks ? 'Lädt...' : 'Blöcke Anzeigen'}
                 </button>
               </div>
 
