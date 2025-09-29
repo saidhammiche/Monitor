@@ -25,6 +25,13 @@ function App() {
   const [zogihortigeDaten, setZogihortigeDaten] = useState(null);
   const [blocks, setBlocks] = useState([]);
   const [loadingBlocks, setLoadingBlocks] = useState(false);
+  const [notification, setNotification] = useState({ show: false, message: '', type: '' });
+
+  // Fonction pour afficher les notifications
+  const showNotification = (message, type = 'danger') => {
+    setNotification({ show: true, message, type });
+    setTimeout(() => setNotification({ show: false, message: '', type: '' }), 5000);
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -33,13 +40,13 @@ function App() {
 
   const loadChargeData = async () => {
     if (!formData.chargenNr) {
-      alert('Bitte geben Sie eine ChargeID ein!');
+      showNotification('Bitte geben Sie eine ChargeID ein!', 'warning');
       return;
     }
 
     setLoadingData(true);
     try {
-      const response = await fetch(`http://4.245.3.186:5000/api/efcharge/${formData.chargenNr}`);
+      const response = await fetch(`http://48.209.33.37:5004/api/efcharge/${formData.chargenNr}`);
       if (!response.ok) {
         throw new Error('Charge nicht gefunden');
       }
@@ -57,9 +64,10 @@ function App() {
         sorte: data.sorte
       }));
 
-      // Ne plus mettre à jour zogihortigeDaten ici
+      showNotification('Charge erfolgreich geladen!', 'success');
+
     } catch (error) {
-      alert(error.message);
+      showNotification('Die angeforderte Charge konnte nicht gefunden werden. Bitte überprüfen Sie die Buchungsnummer.', 'danger');
       console.error(error);
     } finally {
       setLoadingData(false);
@@ -68,17 +76,18 @@ function App() {
 
   const fetchBlocks = async () => {
     if (!formData.chargenNr) {
-      alert('Bitte geben Sie eine ChargeID ein!');
+      showNotification('Bitte geben Sie eine ChargeID ein!', 'warning');
       return;
     }
     setLoadingBlocks(true);
     try {
-      const resp = await fetch(`http://4.245.3.186:5000/api/blocks/${formData.chargenNr}`);
+      const resp = await fetch(`http://48.209.33.37:5004/api/blocks/${formData.chargenNr}`);
       if (!resp.ok) throw new Error('Fehler beim Laden der Blöcke');
       const data = await resp.json();
       setBlocks(data);
+      showNotification('Blöcke erfolgreich geladen!', 'success');
     } catch (e) {
-      alert(e.message);
+      showNotification('Fehler beim Laden der Blöcke. Bitte versuchen Sie es erneut.', 'danger');
       console.error(e);
     } finally {
       setLoadingBlocks(false);
@@ -138,12 +147,31 @@ function App() {
     if (block.link) {
       window.open(block.link, '_blank');
     } else {
-      alert("Lien non disponible pour ce bloc.");
+      showNotification('Lien non disponible pour ce bloc.', 'warning');
     }
   };
 
   return (
     <div className="container py-5">
+      {/* Notification professionnelle */}
+      {notification.show && (
+        <div className={`alert alert-${notification.type} alert-dismissible fade show mb-4`} role="alert">
+          <div className="d-flex align-items-center">
+            <i className={`bi ${
+              notification.type === 'success' ? 'bi-check-circle-fill' : 
+              notification.type === 'warning' ? 'bi-exclamation-triangle-fill' : 
+              'bi-exclamation-octagon-fill'
+            } me-2`}></i>
+            <span>{notification.message}</span>
+          </div>
+          <button 
+            type="button" 
+            className="btn-close" 
+            onClick={() => setNotification({ show: false, message: '', type: '' })}
+          ></button>
+        </div>
+      )}
+
       <div className="row justify-content-center">
         <div className="col-md-8">
           <div className="card shadow-lg rounded-4 border-0">
@@ -154,7 +182,7 @@ function App() {
             <div className="card-body">
               <div className="row mb-3">
                 <div className="col">
-                  <label className="form-label fw-semibold">ChargeID</label>
+                  <label className="form-label fw-semibold">Buchungsnummer</label>
                   <input
                     type="text"
                     className="form-control"
@@ -225,7 +253,7 @@ function App() {
 
               <div className="row mb-3">
                 <div className="col">
-                  <label className="form-label fw-semibold">Blöcke Gut</label>
+                  <label className="form-label fw-semibold">Pakete ohne Befund</label>
                   <input
                     type="number"
                     className="form-control"
@@ -235,7 +263,7 @@ function App() {
                   />
                 </div>
                 <div className="col">
-                  <label className="form-label fw-semibold">Blöcke Schlecht</label>
+                  <label className="form-label fw-semibold">Pakete mit Fe</label>
                   <input
                     type="number"
                     className="form-control"
@@ -245,7 +273,7 @@ function App() {
                   />
                 </div>
                 <div className="col">
-                  <label className="form-label fw-semibold">Blöcke Gesamt</label>
+                  <label className="form-label fw-semibold">Pakete Gesamt</label>
                   <input
                     type="number"
                     className="form-control"
@@ -271,21 +299,21 @@ function App() {
                   PDF herunterladen
                 </button>
 
-
                 <button
                   className="btn flex-grow-1"
                   onClick={async () => {
                     if (!formData.chargenNr) {
-                      alert('Bitte geben Sie eine ChargeID ein!');
+                      showNotification('Bitte geben Sie eine ChargeID ein!', 'warning');
                       return;
                     }
                     try {
-                      const response = await fetch(`http://4.245.3.186:5000/api/efcharge/${formData.chargenNr}`);
+                      const response = await fetch(`http://48.209.33.37:5004/api/efcharge/${formData.chargenNr}`);
                       if (!response.ok) throw new Error('Daten nicht gefunden');
                       const data = await response.json();
                       setZogihortigeDaten(data);
+                      showNotification('Chargendaten erfolgreich angezeigt!', 'success');
                     } catch (error) {
-                      alert(error.message);
+                      showNotification('Chargendaten konnten nicht geladen werden.', 'danger');
                     }
                   }}
                   disabled={!formData.chargenNr}
@@ -305,9 +333,9 @@ function App() {
                     backgroundColor: '#3b7695',
                     borderColor: '#3b7695',
                     color: 'white'
-                  }} onClick={fetchBlocks}
+                  }} 
+                  onClick={fetchBlocks}
                   disabled={loadingBlocks || !formData.chargenNr}
-
                 >
                   <i className="bi bi-box-seam"></i>
                   {loadingBlocks ? 'Lädt...' : 'Blöcke Anzeigen'}
@@ -323,14 +351,14 @@ function App() {
                     <table className="table table-bordered table-striped">
                       <thead className="table-primary">
                         <tr>
-                          <th>ChargeID</th>
-                          <th>NummerPanter</th>
+                          <th>Buchungsnummer</th>
+                          
                           <th>Bezeichnung</th>
                           <th>Startzeit</th>
                           <th>Endzeit</th>
-                          <th>Blöcke Gut</th>
-                          <th>Blöcke Schlecht</th>
-                          <th>Gesamt</th>
+                          <th>Pakete ohne Befund</th>
+                          <th>Pakete mit Fe</th>
+                          <th>Pakete Gesamt</th>
                           <th>Lieferant</th>
                           <th>Sorte</th>
                         </tr>
@@ -338,7 +366,7 @@ function App() {
                       <tbody>
                         <tr>
                           <td>{zogihortigeDaten.chargenNr || '-'}</td>
-                          <td>{zogihortigeDaten.nummerPanter || '-'}</td>
+                        
                           <td>{zogihortigeDaten.bezeichnung || '-'}</td>
                           <td>{formatDateTime(zogihortigeDaten.startzeit)}</td>
                           <td>{formatDateTime(zogihortigeDaten.endzeit)}</td>

@@ -3,7 +3,7 @@ services:
     build:
       context: ./chargen-monitor
     ports:
-      - "3000:80"
+      - "3004:80"
     depends_on:
       - backend
 
@@ -11,6 +11,6 @@ services:
     build:
       context: ./server
     ports:
-      - "5000:3000"
+      - "5004:3000"
     env_file:
       - ./server/.env
