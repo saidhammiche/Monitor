@@ -347,7 +347,7 @@ function App() {
 
     setLoadingData(true);
     try {
-      const response = await fetch(`http://4.231.17.30:5004/api/efcharge/${formData.chargenNr}`);
+      const response = await fetch(`http://185.80.92.91:5004/api/efcharge/${formData.chargenNr}`);
       if (!response.ok) {
         throw new Error('Charge nicht gefunden');
       }
@@ -383,7 +383,7 @@ function App() {
     }
     setLoadingBlocks(true);
     try {
-      const resp = await fetch(`http://4.231.17.30:5004/api/blocks/${formData.chargenNr}`);
+      const resp = await fetch(`http://185.80.92.91:5004/api/blocks/${formData.chargenNr}`);
       if (!resp.ok) throw new Error('Fehler beim Laden der Blöcke');
       const data = await resp.json();
       setBlocks(data);
@@ -403,7 +403,7 @@ function App() {
     }
     setLoadingPaletten(true);
     try {
-      const resp = await fetch(`http://4.231.17.30:5004/api/paletten/${formData.chargenNr}`);
+      const resp = await fetch(`http://185.80.92.91:5004/api/paletten/${formData.chargenNr}`);
       let body = null;
       try {
         body = await resp.json();
